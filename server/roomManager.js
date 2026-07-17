@@ -55,7 +55,7 @@ class RoomManager {
         if (this.rooms.has(id) && this.rooms.get(id).users.size === 0) {
           this.deleteRoom(id);
         }
-      }, 5000);
+      }, 30000);
       return { room: null, deleted: false, user };
     }
     if (room.host === socketId) {

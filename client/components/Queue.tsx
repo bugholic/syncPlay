@@ -11,19 +11,20 @@ interface QueueItem {
 interface QueueProps {
   queue: QueueItem[];
   onRemove: (queueId: string) => void;
+  onPlay?: (item: QueueItem) => void;
 }
 
-export default function Queue({ queue, onRemove }: QueueProps) {
+export default function Queue({ queue, onRemove, onPlay }: QueueProps) {
   if (queue.length === 0) {
     return (
       <div className="text-center py-6 text-muted text-sm">
-        Queue is empty. Search and add songs above.
+        Queue is empty. Add songs to get started.
       </div>
     );
   }
 
   return (
-    <div className="space-y-2 max-h-48 overflow-y-auto">
+    <div className="space-y-2">
       {queue.map((item, i) => (
         <div
           key={item.queueId}
@@ -39,6 +40,17 @@ export default function Queue({ queue, onRemove }: QueueProps) {
             <p className="text-sm truncate">{item.title}</p>
             <p className="text-xs text-muted">Added by {item.addedBy}</p>
           </div>
+          {onPlay && (
+            <button
+              onClick={() => onPlay(item)}
+              className="text-primary/60 hover:text-primary text-xs px-2 py-1 rounded transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+              title="Play now"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => onRemove(item.queueId)}
             className="text-danger/50 hover:text-danger text-sm px-2 opacity-0 group-hover:opacity-100 transition-all shrink-0"

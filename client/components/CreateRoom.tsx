@@ -5,7 +5,7 @@ import { connectSocket } from "@/lib/socket";
 import { setUsername as saveUsername, setApiKey as saveApiKey, getUsername, getApiKey } from "@/lib/storage";
 
 interface CreateRoomProps {
-  onRoomCreated: (roomId: string) => void;
+  onRoomCreated: (roomId: string, password?: string) => void;
 }
 
 export default function CreateRoom({ onRoomCreated }: CreateRoomProps) {
@@ -21,6 +21,12 @@ export default function CreateRoom({ onRoomCreated }: CreateRoomProps) {
       return;
     }
 
+    const uname = getUsername();
+    if (!uname) {
+      setError("Please save your username first on the home page");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -33,12 +39,12 @@ export default function CreateRoom({ onRoomCreated }: CreateRoomProps) {
           isPublic,
           password: isPublic ? null : password,
           apiKey: getApiKey(),
-          username: getUsername(),
+          username: uname,
         },
         (response: { success: boolean; roomId?: string; error?: string }) => {
           setLoading(false);
           if (response.success && response.roomId) {
-            onRoomCreated(response.roomId);
+            onRoomCreated(response.roomId, isPublic ? "" : password);
           } else {
             setError(response.error || "Failed to create room");
           }

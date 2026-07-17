@@ -4,6 +4,8 @@ const STORAGE_KEYS = {
   USERNAME: "syncplay_username",
   API_KEY: "syncplay_apiKey",
   RECENT: "syncplay_recent",
+  CURRENT_ROOM: "syncplay_currentRoom",
+  ROOM_PASSWORD: "syncplay_roomPassword",
 } as const;
 
 export function getUsername(): string {
@@ -49,4 +51,21 @@ export function addRecentRoom(room: RecentRoom) {
 export function removeRecentRoom(id: string) {
   const rooms = getRecentRooms().filter((r) => r.id !== id);
   localStorage.setItem(STORAGE_KEYS.RECENT, JSON.stringify(rooms));
+}
+
+export function getCurrentRoom(): { roomId: string; password: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_ROOM) || "null");
+  } catch {
+    return null;
+  }
+}
+
+export function setCurrentRoom(roomId: string, password: string = "") {
+  localStorage.setItem(STORAGE_KEYS.CURRENT_ROOM, JSON.stringify({ roomId, password }));
+}
+
+export function clearCurrentRoom() {
+  localStorage.removeItem(STORAGE_KEYS.CURRENT_ROOM);
 }

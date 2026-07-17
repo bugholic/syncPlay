@@ -1,50 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { connectSocket } from "@/lib/socket";
-import { getUsername, getApiKey } from "@/lib/storage";
+import { getUsername } from "@/lib/storage";
 
 interface JoinRoomProps {
-  onRoomJoined: (roomId: string) => void;
+  onRoomJoined: (roomId: string, password?: string) => void;
 }
 
 export default function JoinRoom({ onRoomJoined }: JoinRoomProps) {
   const [roomId, setRoomId] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleJoin = async () => {
+  const handleJoin = () => {
     if (!roomId.trim()) {
       setError("Room ID is required");
       return;
     }
 
-    setLoading(true);
-    setError("");
-
-    try {
-      const socket = connectSocket();
-      socket.emit(
-        "join-room",
-        {
-          roomId: roomId.trim(),
-          password,
-          username: getUsername(),
-        },
-        (response: { success: boolean; room?: { id: string }; error?: string }) => {
-          setLoading(false);
-          if (response.success) {
-            onRoomJoined(roomId.trim());
-          } else {
-            setError(response.error || "Failed to join room");
-          }
-        }
-      );
-    } catch {
-      setLoading(false);
-      setError("Failed to connect to server");
+    const uname = getUsername();
+    if (!uname) {
+      setError("Please save your username first on the home page");
+      return;
     }
+
+    setError("");
+    onRoomJoined(roomId.trim(), password);
   };
 
   return (
@@ -82,10 +63,9 @@ export default function JoinRoom({ onRoomJoined }: JoinRoomProps) {
 
         <button
           onClick={handleJoin}
-          disabled={loading}
-          className="w-full bg-accent hover:bg-accent/80 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
+          className="w-full bg-accent hover:bg-accent/80 text-white font-semibold py-2.5 rounded-lg transition-colors"
         >
-          {loading ? "Joining..." : "Join Room"}
+          Join Room
         </button>
       </div>
     </div>

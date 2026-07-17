@@ -78,6 +78,10 @@ app.get('/api/rooms', (req, res) => {
   res.json(roomManager.getPublicRooms());
 });
 
+app.get('/api/rooms/:id/exists', (req, res) => {
+  res.json({ exists: !!roomManager.getRoom(req.params.id) });
+});
+
 app.get('/api/playlist/:playlistId', async (req, res) => {
   const { playlistId } = req.params;
   try {

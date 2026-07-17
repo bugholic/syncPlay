@@ -8,11 +8,39 @@ interface RoomHistoryProps {
   refreshKey?: number;
 }
 
+const SERVER_URL = "http://localhost:3001";
+
 export default function RoomHistory({ onJoinRoom, refreshKey }: RoomHistoryProps) {
   const [rooms, setRooms] = useState<RecentRoom[]>([]);
 
   useEffect(() => {
-    setRooms(getRecentRooms());
+    const recent = getRecentRooms();
+    setRooms(recent);
+
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        recent.map(async (room) => {
+          try {
+            const res = await fetch(`${SERVER_URL}/api/rooms/${room.id}/exists`);
+            const data = await res.json();
+            return { id: room.id, exists: !!data.exists };
+          } catch {
+            return { id: room.id, exists: true };
+          }
+        })
+      );
+      if (cancelled) return;
+      const closedIds = results.filter((r) => !r.exists).map((r) => r.id);
+      if (closedIds.length > 0) {
+        closedIds.forEach(removeRecentRoom);
+        setRooms(getRecentRooms());
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
   const handleRemove = (id: string) => {

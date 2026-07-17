@@ -9,6 +9,7 @@ import {
   getApiKey,
   setApiKey,
   addRecentRoom,
+  setCurrentRoom,
 } from "@/lib/storage";
 import CreateRoom from "@/components/CreateRoom";
 import JoinRoom from "@/components/JoinRoom";
@@ -36,14 +37,16 @@ export default function Home() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleRoomJoined = (roomId: string) => {
+  const handleRoomJoined = (roomId: string, password?: string) => {
     addRecentRoom({ id: roomId, name: "Room " + roomId, lastJoined: Date.now() });
+    setCurrentRoom(roomId, password || "");
     setHistoryKey((k) => k + 1);
     router.push(`/room/${roomId}`);
   };
 
-  const handleRoomCreated = (roomId: string) => {
+  const handleRoomCreated = (roomId: string, password?: string) => {
     addRecentRoom({ id: roomId, name: "Room " + roomId, lastJoined: Date.now() });
+    setCurrentRoom(roomId, password || "");
     setHistoryKey((k) => k + 1);
     router.push(`/room/${roomId}`);
   };
@@ -128,7 +131,7 @@ export default function Home() {
 
         <RoomList onRoomJoined={handleRoomJoined} />
 
-        <RoomHistory onJoinRoom={(id) => router.push(`/room/${id}`)} refreshKey={historyKey} />
+        <RoomHistory onJoinRoom={handleRoomJoined} refreshKey={historyKey} />
       </main>
 
       <footer className="border-t border-card-border p-4 text-center text-xs text-muted">

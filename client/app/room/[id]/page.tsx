@@ -3,7 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { connectSocket, getSocket } from "@/lib/socket";
-import { getUsername, getApiKey, addRecentRoom } from "@/lib/storage";
+import {
+  getUsername,
+  getApiKey,
+  addRecentRoom,
+  setCurrentRoom,
+  clearCurrentRoom,
+  getCurrentRoom,
+} from "@/lib/storage";
 import YouTubePlayer from "@/components/YouTubePlayer";
 import SearchBar from "@/components/SearchBar";
 import Queue from "@/components/Queue";
@@ -58,33 +65,51 @@ export default function RoomPage() {
     setUsername(uname);
     setApiKey(key);
 
+    const stored = getCurrentRoom();
+    const password = stored?.roomId === roomId ? stored.password : "";
+
     const socket = connectSocket();
 
-    socket.emit(
-      "join-room",
-      { roomId, password: "", username: uname },
-      (response: { success: boolean; room?: any; error?: string }) => {
-        if (response.success && response.room) {
-          const r = response.room;
-          setRoomName(r.name);
-          setCurrentVideo(r.currentVideo);
-          setIsPlaying(r.isPlaying);
-          setSyncTime(r.currentTime);
-          setShouldSync(true);
-          setQueue(r.queue || []);
-          setMessages(r.messages || []);
-          setUsers(r.users || []);
-          setHost(r.host);
-          if (r.apiKey) setApiKey(r.apiKey);
-          addRecentRoom({ id: roomId, name: r.name, lastJoined: Date.now() });
-          setConnected(true);
-        } else {
-          setError(response.error || "Failed to join room");
+    function doJoin() {
+      socket.emit(
+        "join-room",
+        { roomId, password, username: uname },
+        (response: { success: boolean; room?: any; error?: string }) => {
+          if (response.success && response.room) {
+            const r = response.room;
+            setRoomName(r.name);
+            setCurrentVideo(r.currentVideo);
+            setIsPlaying(r.isPlaying);
+            setSyncTime(r.currentTime);
+            setShouldSync(true);
+            setQueue(r.queue || []);
+            setMessages(r.messages || []);
+            setUsers(r.users || []);
+            setHost(r.host);
+            if (r.apiKey) setApiKey(r.apiKey);
+            addRecentRoom({ id: roomId, name: r.name, lastJoined: Date.now() });
+            setCurrentRoom(roomId, password);
+            setConnected(true);
+            setError("");
+          } else {
+            setError(response.error || "Failed to join room");
+          }
         }
-      }
-    );
+      );
+    }
 
-    socket.on("room-state", (r: any) => {
+    doJoin();
+
+    function onReconnect() {
+      setConnected(true);
+      doJoin();
+    }
+
+    function onDisconnect() {
+      setConnected(false);
+    }
+
+    function onRoomState(r: any) {
       setCurrentVideo(r.currentVideo);
       setIsPlaying(r.isPlaying);
       setSyncTime(r.currentTime);
@@ -93,70 +118,81 @@ export default function RoomPage() {
       setUsers(r.users || []);
       setHost(r.host);
       setRoomName(r.name);
-    });
+    }
 
-    socket.on("play", ({ videoId, title, thumbnail, time, queue: q }: any) => {
+    function onPlay({ videoId, title, thumbnail, time, queue: q }: any) {
       ignoreNextPlay.current = true;
       setCurrentVideo({ id: videoId, title, thumbnail });
       setIsPlaying(true);
       setSyncTime(time);
       setShouldSync(true);
       if (q) setQueue(q);
-    });
+    }
 
-    socket.on("pause", ({ time }: any) => {
+    function onPause({ time }: any) {
       ignoreNextPause.current = true;
       setIsPlaying(false);
       setSyncTime(time);
       setShouldSync(true);
-    });
+    }
 
-    socket.on("seek", ({ time }: any) => {
+    function onSeek({ time }: any) {
       setSyncTime(time);
       setShouldSync(true);
-    });
+    }
 
-    socket.on("video-ended", () => {
+    function onVideoEnded() {
       setIsPlaying(false);
       setCurrentVideo(null);
-    });
+    }
 
-    socket.on("queue-updated", (q: QueueItem[]) => {
+    function onQueueUpdated(q: QueueItem[]) {
       setQueue(q);
-    });
+    }
 
-    socket.on("chat-message", (msg: ChatMessage) => {
+    function onChatMessage(msg: ChatMessage) {
       setMessages((prev) => [...prev, msg]);
-    });
+    }
 
-    socket.on("user-joined", ({ user, users: u }: any) => {
+    function onUserJoined({ users: u }: any) {
       setUsers(u);
-    });
+    }
 
-    socket.on("user-left", ({ user, users: u }: any) => {
+    function onUserLeft({ users: u }: any) {
       setUsers(u);
-    });
+    }
 
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
+    socket.on("connect", onReconnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("room-state", onRoomState);
+    socket.on("play", onPlay);
+    socket.on("pause", onPause);
+    socket.on("seek", onSeek);
+    socket.on("video-ended", onVideoEnded);
+    socket.on("queue-updated", onQueueUpdated);
+    socket.on("chat-message", onChatMessage);
+    socket.on("user-joined", onUserJoined);
+    socket.on("user-left", onUserLeft);
 
     return () => {
       if (navigatingAway.current) {
         socket.emit("leave-room");
+        clearCurrentRoom();
       }
-      socket.off("room-state");
-      socket.off("play");
-      socket.off("pause");
-      socket.off("seek");
-      socket.off("video-ended");
-      socket.off("queue-updated");
-      socket.off("chat-message");
-      socket.off("user-joined");
-      socket.off("user-left");
-      socket.off("connect");
-      socket.off("disconnect");
+      socket.off("connect", onReconnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("room-state", onRoomState);
+      socket.off("play", onPlay);
+      socket.off("pause", onPause);
+      socket.off("seek", onSeek);
+      socket.off("video-ended", onVideoEnded);
+      socket.off("queue-updated", onQueueUpdated);
+      socket.off("chat-message", onChatMessage);
+      socket.off("user-joined", onUserJoined);
+      socket.off("user-left", onUserLeft);
     };
-  }, [roomId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]);
 
   const handlePlay = useCallback(
     (time: number) => {
@@ -296,8 +332,11 @@ export default function RoomPage() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-3">
-        <div className="hidden md:grid md:grid-cols-[1fr,340px] gap-4 h-[calc(100vh-80px)]">
-          <div className="space-y-4 overflow-y-auto pr-2">
+        <div
+          className="hidden md:grid gap-4"
+          style={{ gridTemplateColumns: "340px 1fr", height: "calc(100vh - 80px)" }}
+        >
+          <div className="space-y-3 overflow-y-auto pr-1">
             <YouTubePlayer
               videoId={currentVideo?.id || null}
               isPlaying={isPlaying}
@@ -309,50 +348,46 @@ export default function RoomPage() {
               shouldSync={shouldSync}
             />
             {currentVideo && (
-              <div className="bg-card border border-card-border rounded-xl p-4">
-                <h3 className="font-medium">{currentVideo.title}</h3>
+              <div className="bg-card border border-card-border rounded-xl p-3">
+                <h3 className="font-medium text-sm truncate">{currentVideo.title}</h3>
               </div>
             )}
-            <div className="bg-card border border-card-border rounded-xl p-4">
-              <h3 className="text-sm font-medium text-muted mb-3">Add to Queue</h3>
-              <SearchBar apiKey={apiKey} onAddToQueue={handleAddToQueue} />
-            </div>
-            <div className="bg-card border border-card-border rounded-xl p-4">
-              <h3 className="text-sm font-medium text-muted mb-3">
-                Queue ({queue.length} {queue.length === 1 ? "song" : "songs"})
-              </h3>
-              <Queue queue={queue} onRemove={handleRemoveFromQueue} />
-              {queue.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  {queue.map((item) => (
-                    <button
-                      key={item.queueId}
-                      onClick={() => handlePlayFromQueue(item)}
-                      className="w-full text-left bg-primary/10 hover:bg-primary/20 text-primary text-xs px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      Play now: {item.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="bg-card border border-card-border rounded-xl p-4">
-              <h3 className="text-sm font-medium text-muted mb-3">In this room</h3>
+            <div className="bg-card border border-card-border rounded-xl p-3">
+              <h3 className="text-xs font-medium text-muted mb-2">In this room</h3>
               <UserList users={users} host={host} username={username} />
             </div>
           </div>
-          <div className="bg-card border border-card-border rounded-xl flex flex-col h-full overflow-hidden">
-            <div className="p-3 border-b border-card-border">
-              <h3 className="text-sm font-medium text-muted">Chat</h3>
+
+          <div className="flex flex-col gap-3 min-h-0">
+            <div className="bg-card border border-card-border rounded-xl p-4 shrink-0">
+              <h3 className="text-sm font-medium text-muted mb-3">Add to Queue</h3>
+              <SearchBar apiKey={apiKey} onAddToQueue={handleAddToQueue} />
             </div>
-            <div className="flex-1 min-h-0">
-              <Chat messages={messages} onSend={handleSendChat} username={username} />
+
+            <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
+              <div className="p-3 border-b border-card-border flex items-center justify-between shrink-0">
+                <h3 className="text-sm font-medium text-muted">
+                  Queue ({queue.length} {queue.length === 1 ? "song" : "songs"})
+                </h3>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-3">
+                <Queue queue={queue} onRemove={handleRemoveFromQueue} onPlay={handlePlayFromQueue} />
+              </div>
+            </div>
+
+            <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
+              <div className="p-3 border-b border-card-border shrink-0">
+                <h3 className="text-sm font-medium text-muted">Chat</h3>
+              </div>
+              <div className="flex-1 min-h-0">
+                <Chat messages={messages} onSend={handleSendChat} username={username} />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="md:hidden flex flex-col h-[calc(100vh-80px)]">
-          <div className="flex gap-2 mb-3">
+        <div className="md:hidden flex flex-col" style={{ height: "calc(100vh - 80px)" }}>
+          <div className="flex gap-2 mb-3 shrink-0">
             <button
               onClick={() => setMobileTab("player")}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -398,7 +433,7 @@ export default function RoomPage() {
               )}
               <div className="bg-card border border-card-border rounded-xl p-3">
                 <h3 className="text-sm font-medium text-muted mb-2">Queue ({queue.length})</h3>
-                <Queue queue={queue} onRemove={handleRemoveFromQueue} />
+                <Queue queue={queue} onRemove={handleRemoveFromQueue} onPlay={handlePlayFromQueue} />
               </div>
               <div className="bg-card border border-card-border rounded-xl p-3">
                 <h3 className="text-sm font-medium text-muted mb-2">Users</h3>
