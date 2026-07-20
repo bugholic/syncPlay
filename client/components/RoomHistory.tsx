@@ -8,7 +8,7 @@ interface RoomHistoryProps {
   refreshKey?: number;
 }
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
 export default function RoomHistory({ onJoinRoom, refreshKey }: RoomHistoryProps) {
   const [rooms, setRooms] = useState<RecentRoom[]>([]);

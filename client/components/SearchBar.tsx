@@ -18,7 +18,9 @@ interface SearchBarProps {
   serverUrl?: string;
 }
 
-export default function SearchBar({ apiKey, onAddToQueue, serverUrl = "http://localhost:3001" }: SearchBarProps) {
+const DEFAULT_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
+
+export default function SearchBar({ apiKey, onAddToQueue, serverUrl = DEFAULT_SERVER_URL }: SearchBarProps) {
   const [tab, setTab] = useState<"search" | "link">("search");
   const [searchInput, setSearchInput] = useState("");
   const [linkInput, setLinkInput] = useState("");

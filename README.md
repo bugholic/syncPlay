@@ -31,6 +31,14 @@ Client runs on `http://localhost:3000`
 - **No Login Required** - Just pick a username
 - **Room History** - Previously joined rooms saved in localStorage
 
+## Environment Variables
+
+| Var | Where | Purpose |
+|-----|-------|---------|
+| `PORT` | server | Port the server listens on (default `3001`) |
+| `CLIENT_ORIGIN` | server | Comma-separated list of allowed client origins for Socket.IO CORS (default `http://localhost:3000,http://localhost:3001`) |
+| `NEXT_PUBLIC_SOCKET_URL` | client | URL of the deployed server, e.g. `https://api.example.com` (default `http://localhost:3001`) |
+
 ## YouTube API Key
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)

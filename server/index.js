@@ -56,11 +56,15 @@ function extractVideosFromPage(html) {
   return videos;
 }
 
+const CLIENT_ORIGINS = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(',').map((origin) => origin.trim())
+  : ['http://localhost:3000', 'http://localhost:3001','https://sync-play-gamma.vercel.app'];
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: CLIENT_ORIGINS,
     methods: ['GET', 'POST'],
   },
 });
