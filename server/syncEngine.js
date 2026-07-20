@@ -5,7 +5,7 @@ function serializeRoom(room) {
     isPublic: room.isPublic,
     hasPassword: !!room.password,
     host: room.host,
-    apiKey: room.apiKey,
+    hasApiKey: !!room.apiKey,
     currentVideo: room.currentVideo,
     currentTime: room.currentTime,
     isPlaying: room.isPlaying,

@@ -1,5 +1,8 @@
 const { v4: uuidv4 } = require('uuid');
 
+const SEARCH_RATE_LIMIT = 15; // max searches per room...
+const SEARCH_RATE_WINDOW_MS = 30000; // ...per this window
+
 class RoomManager {
   constructor() {
     this.rooms = new Map();
@@ -116,6 +119,17 @@ class RoomManager {
     const room = this.rooms.get(id);
     if (!room || room.queue.length === 0) return null;
     return room.queue.shift();
+  }
+
+  canSearch(id) {
+    const room = this.rooms.get(id);
+    if (!room) return false;
+    const now = Date.now();
+    if (!room._searchLog) room._searchLog = [];
+    room._searchLog = room._searchLog.filter((ts) => now - ts < SEARCH_RATE_WINDOW_MS);
+    if (room._searchLog.length >= SEARCH_RATE_LIMIT) return false;
+    room._searchLog.push(now);
+    return true;
   }
 
   setPlayback(id, { video, time, isPlaying }) {

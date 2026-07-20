@@ -13,14 +13,14 @@ interface SearchResult {
 }
 
 interface SearchBarProps {
-  apiKey: string;
+  roomId: string;
   onAddToQueue: (video: { id: string; title: string; thumbnail: string }) => void;
   serverUrl?: string;
 }
 
 const DEFAULT_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
-export default function SearchBar({ apiKey, onAddToQueue, serverUrl = DEFAULT_SERVER_URL }: SearchBarProps) {
+export default function SearchBar({ roomId, onAddToQueue, serverUrl = DEFAULT_SERVER_URL }: SearchBarProps) {
   const [tab, setTab] = useState<"search" | "link">("search");
   const [searchInput, setSearchInput] = useState("");
   const [linkInput, setLinkInput] = useState("");
@@ -62,22 +62,17 @@ export default function SearchBar({ apiKey, onAddToQueue, serverUrl = DEFAULT_SE
 
   const search = async () => {
     if (!searchInput.trim()) return;
-    if (!apiKey) {
-      setError("Set your YouTube API key on the home page, or use the Link tab to paste URLs directly");
-      return;
-    }
 
     setSearching(true);
     setError("");
     try {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchInput)}&type=video&maxResults=8&key=${apiKey}`
+        `${serverUrl}/api/rooms/${roomId}/search?q=${encodeURIComponent(searchInput)}`
       );
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error?.message || "Search failed");
-      }
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Search failed");
+      }
       setResults(data.items || []);
     } catch (err: any) {
       setError(err.message || "Search failed");
@@ -143,12 +138,6 @@ export default function SearchBar({ apiKey, onAddToQueue, serverUrl = DEFAULT_SE
               {searching ? "..." : "Search"}
             </button>
           </div>
-
-          {!apiKey && (
-            <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2 mb-3 text-xs text-accent">
-              No API key? Use the <strong>Link</strong> tab to paste YouTube URLs directly
-            </div>
-          )}
 
           {results.length > 0 && (
             <div className="space-y-2 max-h-64 overflow-y-auto">

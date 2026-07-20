@@ -5,7 +5,6 @@ import { useRouter, useParams } from "next/navigation";
 import { connectSocket, getSocket } from "@/lib/socket";
 import {
   getUsername,
-  getApiKey,
   addRecentRoom,
   setCurrentRoom,
   clearCurrentRoom,
@@ -46,7 +45,6 @@ export default function RoomPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [users, setUsers] = useState<string[]>([]);
   const [host, setHost] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [mobileTab, setMobileTab] = useState<"player" | "search" | "chat">("player");
@@ -57,13 +55,11 @@ export default function RoomPage() {
 
   useEffect(() => {
     const uname = getUsername();
-    const key = getApiKey();
     if (!uname) {
       router.push("/");
       return;
     }
     setUsername(uname);
-    setApiKey(key);
 
     const stored = getCurrentRoom();
     const password = stored?.roomId === roomId ? stored.password : "";
@@ -86,7 +82,6 @@ export default function RoomPage() {
             setMessages(r.messages || []);
             setUsers(r.users || []);
             setHost(r.host);
-            if (r.apiKey) setApiKey(r.apiKey);
             addRecentRoom({ id: roomId, name: r.name, lastJoined: Date.now() });
             setCurrentRoom(roomId, password);
             setConnected(true);
@@ -118,7 +113,6 @@ export default function RoomPage() {
       setUsers(r.users || []);
       setHost(r.host);
       setRoomName(r.name);
-      if (r.apiKey) setApiKey((prev) => prev || r.apiKey);
     }
 
     function onPlay({ videoId, title, thumbnail, time, queue: q }: any) {
@@ -376,7 +370,7 @@ export default function RoomPage() {
           <div className="flex flex-col gap-3 min-h-0">
             <div className="bg-card border border-card-border rounded-xl p-4 shrink-0">
               <h3 className="text-sm font-medium text-muted mb-3">Add to Queue</h3>
-              <SearchBar apiKey={apiKey} onAddToQueue={handleAddToQueue} />
+              <SearchBar roomId={roomId} onAddToQueue={handleAddToQueue} />
             </div>
 
             <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
@@ -469,7 +463,7 @@ export default function RoomPage() {
 
           {mobileTab === "search" && (
             <div className="bg-card border border-card-border rounded-xl p-4 flex-1 overflow-y-auto">
-              <SearchBar apiKey={apiKey} onAddToQueue={handleAddToQueue} />
+              <SearchBar roomId={roomId} onAddToQueue={handleAddToQueue} />
             </div>
           )}
 

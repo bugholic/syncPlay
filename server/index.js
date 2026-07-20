@@ -25,6 +25,22 @@ function fetchPage(url) {
   });
 }
 
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, body: JSON.parse(data) });
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
 function extractVideosFromPage(html) {
   const videos = [];
   try {
@@ -99,6 +115,33 @@ app.get('/api/playlist/:playlistId', async (req, res) => {
   } catch (err) {
     console.error('Playlist fetch error:', err.message);
     res.status(500).json({ error: 'Failed to fetch playlist' });
+  }
+});
+
+app.get('/api/rooms/:id/search', async (req, res) => {
+  const room = roomManager.getRoom(req.params.id);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  if (!room.apiKey) return res.status(400).json({ error: 'No YouTube API key is set for this room. Use the Link tab to paste URLs instead.' });
+
+  const q = (req.query.q || '').toString().trim();
+  if (!q) return res.status(400).json({ error: 'Missing search query' });
+
+  if (!roomManager.canSearch(room.id)) {
+    return res.status(429).json({ error: 'This room has hit the search rate limit. Try again in a bit.' });
+  }
+
+  try {
+    // The key stays server-side — the client only ever talks to this proxy,
+    // never to the YouTube Data API directly, so it can't be read from devtools.
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&maxResults=8&key=${room.apiKey}`;
+    const { status, body } = await fetchJson(url);
+    if (status >= 400) {
+      return res.status(status).json({ error: body.error?.message || 'Search failed' });
+    }
+    res.json({ items: body.items || [] });
+  } catch (err) {
+    console.error('Search proxy error:', err.message);
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 
