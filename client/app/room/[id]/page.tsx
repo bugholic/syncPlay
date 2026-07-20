@@ -118,6 +118,7 @@ export default function RoomPage() {
       setUsers(r.users || []);
       setHost(r.host);
       setRoomName(r.name);
+      if (r.apiKey) setApiKey((prev) => prev || r.apiKey);
     }
 
     function onPlay({ videoId, title, thumbnail, time, queue: q }: any) {
@@ -234,8 +235,8 @@ export default function RoomPage() {
   );
 
   const handleVideoEnd = useCallback(() => {
-    getSocket().emit("skip", { roomId });
-  }, [roomId]);
+    getSocket().emit("skip", { roomId, videoId: currentVideo?.id });
+  }, [roomId, currentVideo]);
 
   const handleAddToQueue = useCallback(
     (video: { id: string; title: string; thumbnail: string }) => {
@@ -247,6 +248,20 @@ export default function RoomPage() {
   const handleRemoveFromQueue = useCallback(
     (queueId: string) => {
       getSocket().emit("remove-from-queue", { roomId, queueId });
+    },
+    [roomId]
+  );
+
+  const handleReorderQueue = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return;
+      setQueue((prev) => {
+        const next = [...prev];
+        const [item] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, item);
+        return next;
+      });
+      getSocket().emit("reorder-queue", { roomId, fromIndex, toIndex });
     },
     [roomId]
   );
@@ -371,7 +386,12 @@ export default function RoomPage() {
                 </h3>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-3">
-                <Queue queue={queue} onRemove={handleRemoveFromQueue} onPlay={handlePlayFromQueue} />
+                <Queue
+                  queue={queue}
+                  onRemove={handleRemoveFromQueue}
+                  onPlay={handlePlayFromQueue}
+                  onReorder={handleReorderQueue}
+                />
               </div>
             </div>
 
@@ -433,7 +453,12 @@ export default function RoomPage() {
               )}
               <div className="bg-card border border-card-border rounded-xl p-3">
                 <h3 className="text-sm font-medium text-muted mb-2">Queue ({queue.length})</h3>
-                <Queue queue={queue} onRemove={handleRemoveFromQueue} onPlay={handlePlayFromQueue} />
+                <Queue
+                  queue={queue}
+                  onRemove={handleRemoveFromQueue}
+                  onPlay={handlePlayFromQueue}
+                  onReorder={handleReorderQueue}
+                />
               </div>
               <div className="bg-card border border-card-border rounded-xl p-3">
                 <h3 className="text-sm font-medium text-muted mb-2">Users</h3>

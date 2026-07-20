@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface QueueItem {
   id: string;
   title: string;
@@ -12,9 +14,13 @@ interface QueueProps {
   queue: QueueItem[];
   onRemove: (queueId: string) => void;
   onPlay?: (item: QueueItem) => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
-export default function Queue({ queue, onRemove, onPlay }: QueueProps) {
+export default function Queue({ queue, onRemove, onPlay, onReorder }: QueueProps) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
   if (queue.length === 0) {
     return (
       <div className="text-center py-6 text-muted text-sm">
@@ -23,13 +29,47 @@ export default function Queue({ queue, onRemove, onPlay }: QueueProps) {
     );
   }
 
+  const handleDrop = (toIndex: number) => {
+    if (dragIndex !== null && onReorder) {
+      onReorder(dragIndex, toIndex);
+    }
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
   return (
     <div className="space-y-2">
       {queue.map((item, i) => (
         <div
           key={item.queueId}
-          className="flex items-center gap-3 bg-background rounded-lg p-2 border border-card-border hover:border-primary/30 transition-all group"
+          draggable={!!onReorder}
+          onDragStart={() => setDragIndex(i)}
+          onDragEnter={() => dragIndex !== null && setOverIndex(i)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleDrop(i);
+          }}
+          onDragEnd={() => {
+            setDragIndex(null);
+            setOverIndex(null);
+          }}
+          className={`flex items-center gap-3 bg-background rounded-lg p-2 border transition-all group ${
+            overIndex === i && dragIndex !== null && dragIndex !== i
+              ? "border-primary"
+              : "border-card-border hover:border-primary/30"
+          } ${dragIndex === i ? "opacity-40" : ""}`}
         >
+          {onReorder && (
+            <span
+              className="text-muted/50 hover:text-muted cursor-grab active:cursor-grabbing shrink-0"
+              title="Drag to reorder"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 6a2 2 0 11-4 0 2 2 0 014 0zM9 12a2 2 0 11-4 0 2 2 0 014 0zM9 18a2 2 0 11-4 0 2 2 0 014 0zM19 6a2 2 0 11-4 0 2 2 0 014 0zM19 12a2 2 0 11-4 0 2 2 0 014 0zM19 18a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </span>
+          )}
           <span className="text-xs text-muted w-5 text-center shrink-0">{i + 1}</span>
           <img
             src={item.thumbnail}

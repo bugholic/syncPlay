@@ -5,6 +5,7 @@ function serializeRoom(room) {
     isPublic: room.isPublic,
     hasPassword: !!room.password,
     host: room.host,
+    apiKey: room.apiKey,
     currentVideo: room.currentVideo,
     currentTime: room.currentTime,
     isPlaying: room.isPlaying,
@@ -92,7 +93,13 @@ function setupSyncEngine(io, roomManager) {
       socket.to(roomId).emit('seek', { time });
     });
 
-    socket.on('skip', ({ roomId }) => {
+    socket.on('skip', ({ roomId, videoId }) => {
+      const room = roomManager.getRoom(roomId);
+      if (!room) return;
+      // Every client in the room fires its own video-end event around the same
+      // time. Only honor the first skip for a given "current" video so N
+      // connected clients don't pop N songs off the queue for one song ending.
+      if (videoId !== undefined && room.currentVideo?.id !== videoId) return;
       const nextVideo = roomManager.getNextFromQueue(roomId);
       if (nextVideo) {
         const video = { id: nextVideo.id, title: nextVideo.title, thumbnail: nextVideo.thumbnail };
@@ -135,7 +142,9 @@ function setupSyncEngine(io, roomManager) {
     socket.on('chat-message', ({ roomId, user, text }) => {
       const message = roomManager.addMessage(roomId, user, text);
       if (message) {
-        io.to(roomId).emit('chat-message', message);
+        // Excludes the sender: their own message is already appended
+        // optimistically on the client, so echoing it back would duplicate it.
+        socket.to(roomId).emit('chat-message', message);
       }
     });
 
