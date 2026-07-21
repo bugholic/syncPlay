@@ -140,6 +140,11 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
+function getRedirectUri(req) {
+  if (process.env.GOOGLE_REDIRECT_URI) return process.env.GOOGLE_REDIRECT_URI;
+  return `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+}
+
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.user) {
     return res.status(401).json({ error: 'Not authenticated' });
@@ -151,9 +156,10 @@ app.get('/api/auth/google', (req, res) => {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     return res.status(500).json({ error: 'Google OAuth is not configured on this server' });
   }
+  const redirectUri = getRedirectUri(req);
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'openid email profile https://www.googleapis.com/auth/youtube.readonly',
     access_type: 'offline',
@@ -172,7 +178,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
       code,
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+      redirect_uri: getRedirectUri(req),
       grant_type: 'authorization_code',
     });
     if (tokenRes.error) {
