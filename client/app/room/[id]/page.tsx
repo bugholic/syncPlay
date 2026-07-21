@@ -16,6 +16,7 @@ import Queue from "@/components/Queue";
 import Chat from "@/components/Chat";
 import UserList from "@/components/UserList";
 import YouTubeLibrary from "@/components/YouTubeLibrary";
+import { useToast } from "@/components/Toast";
 
 interface QueueItem {
   id: string;
@@ -35,6 +36,7 @@ export default function RoomPage() {
   const router = useRouter();
   const params = useParams();
   const roomId = params.id as string;
+  const toast = useToast();
 
   const [connected, setConnected] = useState(false);
   const [roomName, setRoomName] = useState("");
@@ -236,8 +238,9 @@ export default function RoomPage() {
   const handleAddToQueue = useCallback(
     (video: { id: string; title: string; thumbnail: string }) => {
       getSocket().emit("add-to-queue", { roomId, video });
+      toast(`Added "${video.title}" to queue`);
     },
-    [roomId]
+    [roomId, toast]
   );
 
   const handleRemoveFromQueue = useCallback(
