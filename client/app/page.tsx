@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { connectSocket } from "@/lib/socket";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { connectSocket, getSocket } from "@/lib/socket";
 import {
   getUsername,
   setUsername,
@@ -15,14 +15,17 @@ import CreateRoom from "@/components/CreateRoom";
 import JoinRoom from "@/components/JoinRoom";
 import RoomList from "@/components/RoomList";
 import RoomHistory from "@/components/RoomHistory";
+import YouTubeLibrary from "@/components/YouTubeLibrary";
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUser] = useState("");
   const [apiKey, setApiKeyState] = useState("");
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"create" | "join">("create");
   const [historyKey, setHistoryKey] = useState(0);
+  const [showLibrary, setShowLibrary] = useState(false);
 
   useEffect(() => {
     setUser(getUsername());
@@ -30,11 +33,30 @@ export default function Home() {
     connectSocket();
   }, []);
 
+  useEffect(() => {
+    const auth = searchParams.get("auth");
+    if (auth === "success") {
+      setShowLibrary(true);
+      router.replace("/", { scroll: false });
+    } else if (auth === "error") {
+      router.replace("/", { scroll: false });
+    }
+  }, [searchParams, router]);
+
   const handleSave = () => {
     setUsername(username);
     setApiKey(apiKey);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleAddToQueueFromLibrary = (video: { id: string; title: string; thumbnail: string }) => {
+    const socket = getSocket();
+    const currentRoom = localStorage.getItem("syncplay_currentRoom");
+    if (currentRoom) {
+      const { roomId } = JSON.parse(currentRoom);
+      socket.emit("add-to-queue", { roomId, video });
+    }
   };
 
   const handleRoomJoined = (roomId: string, password?: string) => {
@@ -129,6 +151,8 @@ export default function Home() {
           <JoinRoom onRoomJoined={handleRoomJoined} />
         )}
 
+        <YouTubeLibrary onAddToQueue={handleAddToQueueFromLibrary} />
+
         <RoomList onRoomJoined={handleRoomJoined} />
 
         <RoomHistory onJoinRoom={handleRoomJoined} refreshKey={historyKey} />
@@ -138,5 +162,13 @@ export default function Home() {
         SyncPlay - Everyone controls the music
       </footer>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted">Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

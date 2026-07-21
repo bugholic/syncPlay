@@ -15,6 +15,7 @@ import SearchBar from "@/components/SearchBar";
 import Queue from "@/components/Queue";
 import Chat from "@/components/Chat";
 import UserList from "@/components/UserList";
+import YouTubeLibrary from "@/components/YouTubeLibrary";
 
 interface QueueItem {
   id: string;
@@ -47,7 +48,7 @@ export default function RoomPage() {
   const [host, setHost] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
-  const [mobileTab, setMobileTab] = useState<"player" | "search" | "chat">("player");
+  const [mobileTab, setMobileTab] = useState<"player" | "search" | "library" | "chat">("player");
 
   const ignoreNextPlay = useRef(false);
   const ignoreNextPause = useRef(false);
@@ -373,6 +374,8 @@ export default function RoomPage() {
               <SearchBar roomId={roomId} onAddToQueue={handleAddToQueue} />
             </div>
 
+            <YouTubeLibrary onAddToQueue={handleAddToQueue} />
+
             <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
               <div className="p-3 border-b border-card-border flex items-center justify-between shrink-0">
                 <h3 className="text-sm font-medium text-muted">
@@ -417,6 +420,14 @@ export default function RoomPage() {
               }`}
             >
               Search
+            </button>
+            <button
+              onClick={() => setMobileTab("library")}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                mobileTab === "library" ? "bg-primary text-white" : "bg-card border border-card-border text-muted"
+              }`}
+            >
+              Library
             </button>
             <button
               onClick={() => setMobileTab("chat")}
@@ -464,6 +475,12 @@ export default function RoomPage() {
           {mobileTab === "search" && (
             <div className="bg-card border border-card-border rounded-xl p-4 flex-1 overflow-y-auto">
               <SearchBar roomId={roomId} onAddToQueue={handleAddToQueue} />
+            </div>
+          )}
+
+          {mobileTab === "library" && (
+            <div className="flex-1 overflow-y-auto">
+              <YouTubeLibrary onAddToQueue={handleAddToQueue} />
             </div>
           )}
 

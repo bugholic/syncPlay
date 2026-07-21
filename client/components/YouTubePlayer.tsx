@@ -106,9 +106,6 @@ export default function YouTubePlayer({
     if (Math.abs(currentTime - syncTime) > 2) {
       player.seekTo(syncTime, true);
     }
-    // Always (re)apply play/pause state, not just when a seek happened —
-    // otherwise resuming from a pause that's already within the drift
-    // threshold never calls playVideo() on remote clients.
     if (isPlaying) {
       player.playVideo();
     } else {
@@ -155,6 +152,24 @@ export default function YouTubePlayer({
     setSeeking(false);
     onSeek(time);
   };
+
+  useEffect(() => {
+    if (!ready || !playerRef.current) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) return;
+      const player = playerRef.current;
+      if (!player || typeof player.getCurrentTime !== "function") return;
+      if (isPlaying) {
+        ignoreEvents.current = true;
+        player.playVideo();
+        setTimeout(() => { ignoreEvents.current = false; }, 500);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [ready, isPlaying]);
 
   const toggleMute = () => {
     const player = playerRef.current;

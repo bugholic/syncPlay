@@ -3,6 +3,7 @@ const http = require('http');
 const https = require('https');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const session = require('express-session');
 const RoomManager = require('./roomManager');
 const setupSyncEngine = require('./syncEngine');
 
@@ -38,6 +39,35 @@ function fetchJson(url) {
         }
       });
     }).on('error', reject);
+  });
+}
+
+function fetchJsonPost(url, body) {
+  return new Promise((resolve, reject) => {
+    const postData = new URLSearchParams(body).toString();
+    const parsed = new URL(url);
+    const req = https.request({
+      hostname: parsed.hostname,
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
   });
 }
 
@@ -85,10 +115,203 @@ const io = new Server(server, {
   },
 });
 
-app.use(cors());
+app.use(cors({
+  origin: CLIENT_ORIGINS,
+  credentials: true,
+}));
 app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'syncplay-session-secret-change-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false,
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: 'lax',
+  },
+}));
 
 const roomManager = new RoomManager();
+
+// ─── Google OAuth ───────────────────────────────────────────────────────────────
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  next();
+}
+
+app.get('/api/auth/google', (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res.status(500).json({ error: 'Google OAuth is not configured on this server' });
+  }
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+    response_type: 'code',
+    scope: 'openid email profile https://www.googleapis.com/auth/youtube.readonly',
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) {
+    return res.redirect(`${CLIENT_URL}?auth=error`);
+  }
+  try {
+    const tokenRes = await fetchJsonPost('https://oauth2.googleapis.com/token', {
+      code,
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+      grant_type: 'authorization_code',
+    });
+    if (tokenRes.error) {
+      console.error('Token exchange failed:', tokenRes);
+      return res.redirect(`${CLIENT_URL}?auth=error`);
+    }
+    const userInfo = await fetchJson(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenRes.access_token}`);
+    req.session.user = {
+      id: userInfo.body.id,
+      email: userInfo.body.email,
+      name: userInfo.body.name,
+      picture: userInfo.body.picture,
+      accessToken: tokenRes.access_token,
+      refreshToken: tokenRes.refresh_token,
+      tokenExpiry: Date.now() + (tokenRes.expires_in || 3600) * 1000,
+    };
+    res.redirect(`${CLIENT_URL}?auth=success`);
+  } catch (err) {
+    console.error('OAuth callback error:', err.message);
+    res.redirect(`${CLIENT_URL}?auth=error`);
+  }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.json({ authenticated: false });
+  }
+  const { accessToken, refreshToken, tokenExpiry, ...safe } = req.session.user;
+  res.json({ authenticated: true, user: safe });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+// ─── YouTube Library (authenticated) ──────────────────────────────────────────
+
+async function ensureAccessToken(req) {
+  const user = req.session.user;
+  if (!user) return null;
+  if (user.tokenExpiry && Date.now() < user.tokenExpiry - 60000) {
+    return user.accessToken;
+  }
+  if (!user.refreshToken) return null;
+  try {
+    const tokenRes = await fetchJsonPost('https://oauth2.googleapis.com/token', {
+      refresh_token: user.refreshToken,
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+    });
+    if (tokenRes.access_token) {
+      user.accessToken = tokenRes.access_token;
+      user.tokenExpiry = Date.now() + (tokenRes.expires_in || 3600) * 1000;
+      return user.accessToken;
+    }
+  } catch (err) {
+    console.error('Token refresh failed:', err.message);
+  }
+  return null;
+}
+
+app.get('/api/youtube/playlists', requireAuth, async (req, res) => {
+  try {
+    const token = await ensureAccessToken(req);
+    if (!token) return res.status(401).json({ error: 'YouTube access expired, please re-login' });
+    const maxResults = Math.min(parseInt(req.query.maxResults) || 25, 50);
+    const { status, body } = await fetchJson(
+      `https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=${maxResults}&access_token=${token}`
+    );
+    if (status >= 400) {
+      return res.status(status).json({ error: body.error?.message || 'Failed to fetch playlists' });
+    }
+    const playlists = (body.items || []).map((item) => ({
+      id: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+      videoCount: item.contentDetails?.itemCount || 0,
+    }));
+    res.json({ playlists, nextPageToken: body.nextPageToken || null });
+  } catch (err) {
+    console.error('YouTube playlists error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch playlists' });
+  }
+});
+
+app.get('/api/youtube/playlists/:playlistId/videos', requireAuth, async (req, res) => {
+  try {
+    const token = await ensureAccessToken(req);
+    if (!token) return res.status(401).json({ error: 'YouTube access expired, please re-login' });
+    const { playlistId } = req.params;
+    const maxResults = Math.min(parseInt(req.query.maxResults) || 25, 50);
+    const pageToken = req.query.pageToken || '';
+    const { status, body } = await fetchJson(
+      `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=${maxResults}${pageToken ? `&pageToken=${pageToken}` : ''}&access_token=${token}`
+    );
+    if (status >= 400) {
+      return res.status(status).json({ error: body.error?.message || 'Failed to fetch playlist videos' });
+    }
+    const videos = (body.items || []).map((item) => ({
+      id: item.contentDetails?.videoId || item.snippet?.resourceId?.videoId,
+      title: item.snippet.title,
+      thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+    })).filter((v) => v.id);
+    res.json({ videos, nextPageToken: body.nextPageToken || null });
+  } catch (err) {
+    console.error('YouTube playlist videos error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch playlist videos' });
+  }
+});
+
+app.get('/api/youtube/liked', requireAuth, async (req, res) => {
+  try {
+    const token = await ensureAccessToken(req);
+    if (!token) return res.status(401).json({ error: 'YouTube access expired, please re-login' });
+    const maxResults = Math.min(parseInt(req.query.maxResults) || 25, 50);
+    const pageToken = req.query.pageToken || '';
+    const { status, body } = await fetchJson(
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&myRating=like&maxResults=${maxResults}${pageToken ? `&pageToken=${pageToken}` : ''}&access_token=${token}`
+    );
+    if (status >= 400) {
+      return res.status(status).json({ error: body.error?.message || 'Failed to fetch liked videos' });
+    }
+    const videos = (body.items || []).map((item) => ({
+      id: item.id,
+      title: item.snippet.title,
+      thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+    }));
+    res.json({ videos, nextPageToken: body.nextPageToken || null });
+  } catch (err) {
+    console.error('YouTube liked videos error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch liked videos' });
+  }
+});
+
+// ─── Existing routes ──────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', rooms: roomManager.getPublicRooms().length });
@@ -121,19 +344,19 @@ app.get('/api/playlist/:playlistId', async (req, res) => {
 app.get('/api/rooms/:id/search', async (req, res) => {
   const room = roomManager.getRoom(req.params.id);
   if (!room) return res.status(404).json({ error: 'Room not found' });
-  if (!room.apiKey) return res.status(400).json({ error: 'No YouTube API key is set for this room. Use the Link tab to paste URLs instead.' });
 
   const q = (req.query.q || '').toString().trim();
   if (!q) return res.status(400).json({ error: 'Missing search query' });
+
+  const apiKey = room.apiKey || process.env.YOUTUBE_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'No YouTube API key is set for this room. Use the Link tab to paste URLs instead.' });
 
   if (!roomManager.canSearch(room.id)) {
     return res.status(429).json({ error: 'This room has hit the search rate limit. Try again in a bit.' });
   }
 
   try {
-    // The key stays server-side — the client only ever talks to this proxy,
-    // never to the YouTube Data API directly, so it can't be read from devtools.
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&maxResults=8&key=${room.apiKey}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&maxResults=8&key=${apiKey}`;
     const { status, body } = await fetchJson(url);
     if (status >= 400) {
       return res.status(status).json({ error: body.error?.message || 'Search failed' });

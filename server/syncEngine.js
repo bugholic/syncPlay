@@ -69,7 +69,6 @@ function setupSyncEngine(io, roomManager) {
         user: username,
         users: serializeUsers(result.room.users),
       });
-      socket.to(roomId).emit('room-state', serializeRoom(result.room));
       console.log(`${username} joined room ${roomId}`);
     });
 
