@@ -25,7 +25,6 @@ function HomeContent() {
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"create" | "join">("create");
   const [historyKey, setHistoryKey] = useState(0);
-  const [showLibrary, setShowLibrary] = useState(false);
 
   useEffect(() => {
     setUser(getUsername());
@@ -36,12 +35,11 @@ function HomeContent() {
   useEffect(() => {
     const auth = searchParams.get("auth");
     if (auth === "success") {
-      setShowLibrary(true);
-      router.replace("/", { scroll: false });
+      window.location.replace("/");
     } else if (auth === "error") {
-      router.replace("/", { scroll: false });
+      window.location.replace("/");
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   const handleSave = () => {
     setUsername(username);
