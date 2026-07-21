@@ -120,15 +120,17 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'syncplay-session-secret-change-me',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: isProduction,
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    sameSite: 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
   },
 }));
 
