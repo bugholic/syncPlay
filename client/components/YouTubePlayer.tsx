@@ -18,6 +18,7 @@ interface YouTubePlayerProps {
   onVideoEnd: () => void;
   syncTime?: number;
   shouldSync: boolean;
+  onSynced?: () => void;
 }
 
 export default function YouTubePlayer({
@@ -29,6 +30,7 @@ export default function YouTubePlayer({
   onVideoEnd,
   syncTime,
   shouldSync,
+  onSynced,
 }: YouTubePlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
@@ -112,7 +114,8 @@ export default function YouTubePlayer({
       player.pauseVideo();
     }
     setTimeout(() => { ignoreEvents.current = false; }, 500);
-  }, [syncTime, shouldSync, ready, isPlaying]);
+    onSynced?.();
+  }, [syncTime, shouldSync, ready, isPlaying, onSynced]);
 
   useEffect(() => {
     if (!ready) return;

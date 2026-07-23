@@ -269,6 +269,10 @@ export default function RoomPage() {
     [roomId]
   );
 
+  const handleSynced = useCallback(() => {
+    setShouldSync(false);
+  }, []);
+
   const handleSendChat = useCallback(
     (text: string) => {
       getSocket().emit("chat-message", { roomId, user: username, text });
@@ -379,6 +383,7 @@ export default function RoomPage() {
               onVideoEnd={handleVideoEnd}
               syncTime={syncTime}
               shouldSync={shouldSync}
+              onSynced={handleSynced}
             />
             {currentVideo && (
               <div className="bg-card border border-card-border rounded-xl p-3">
@@ -399,28 +404,30 @@ export default function RoomPage() {
 
             <YouTubeLibrary onAddToQueue={handleAddToQueue} onPlayNow={handlePlayNow} />
 
-            <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
-              <div className="p-3 border-b border-card-border flex items-center justify-between shrink-0">
-                <h3 className="text-sm font-medium text-muted">
-                  Queue ({queue.length} {queue.length === 1 ? "song" : "songs"})
-                </h3>
+            <div className="grid grid-cols-2 gap-3 min-h-0 flex-1">
+              <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 overflow-hidden">
+                <div className="p-3 border-b border-card-border flex items-center justify-between shrink-0">
+                  <h3 className="text-sm font-medium text-muted">
+                    Queue ({queue.length} {queue.length === 1 ? "song" : "songs"})
+                  </h3>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-3">
+                  <Queue
+                    queue={queue}
+                    onRemove={handleRemoveFromQueue}
+                    onPlay={handlePlayFromQueue}
+                    onReorder={handleReorderQueue}
+                  />
+                </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-3">
-                <Queue
-                  queue={queue}
-                  onRemove={handleRemoveFromQueue}
-                  onPlay={handlePlayFromQueue}
-                  onReorder={handleReorderQueue}
-                />
-              </div>
-            </div>
 
-            <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
-              <div className="p-3 border-b border-card-border shrink-0">
-                <h3 className="text-sm font-medium text-muted">Chat</h3>
-              </div>
-              <div className="flex-1 min-h-0">
-                <Chat messages={messages} onSend={handleSendChat} username={username} />
+              <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 overflow-hidden">
+                <div className="p-3 border-b border-card-border shrink-0">
+                  <h3 className="text-sm font-medium text-muted">Chat</h3>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Chat messages={messages} onSend={handleSendChat} username={username} />
+                </div>
               </div>
             </div>
           </div>
@@ -473,6 +480,7 @@ export default function RoomPage() {
                 onVideoEnd={handleVideoEnd}
                 syncTime={syncTime}
                 shouldSync={shouldSync}
+                onSynced={handleSynced}
               />
               {currentVideo && (
                 <div className="bg-card border border-card-border rounded-xl p-3">
