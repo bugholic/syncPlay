@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { connectSocket, getSocket } from "@/lib/socket";
+import { connectSocket } from "@/lib/socket";
 import {
   getUsername,
   setUsername,
@@ -16,14 +16,11 @@ import CreateRoom from "@/components/CreateRoom";
 import JoinRoom from "@/components/JoinRoom";
 import RoomList from "@/components/RoomList";
 import RoomHistory from "@/components/RoomHistory";
-import YouTubeLibrary from "@/components/YouTubeLibrary";
-import { useToast } from "@/components/Toast";
 import { getAuthUser, redirectToGoogleLogin, logout, AuthUser } from "@/lib/auth";
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const toast = useToast();
   const [username, setUser] = useState("");
   const [apiKey, setApiKeyState] = useState("");
   const [saved, setSaved] = useState(false);
@@ -57,18 +54,6 @@ function HomeContent() {
     setApiKey(apiKey);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleAddToQueueFromLibrary = (video: { id: string; title: string; thumbnail: string }) => {
-    const currentRoom = getCurrentRoom();
-    if (currentRoom) {
-      const socket = getSocket();
-      socket.emit("add-to-queue", { roomId: currentRoom.roomId, video });
-      toast(`Added "${video.title}" to queue`);
-    } else {
-      setShowRoomPanel(true);
-      toast("Create or join a room first, then add songs");
-    }
   };
 
   const handleRoomJoined = (roomId: string, password?: string) => {
@@ -205,8 +190,6 @@ function HomeContent() {
             )}
           </div>
         )}
-
-        <YouTubeLibrary onAddToQueue={handleAddToQueueFromLibrary} inRoom={!!currentRoom} />
 
         {!showRoomPanel && (
           <div className="space-y-4">

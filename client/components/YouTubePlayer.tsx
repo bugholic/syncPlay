@@ -190,26 +190,24 @@ export default function YouTubePlayer({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  if (!videoId) {
-    return (
-      <div className="w-full aspect-video bg-card border border-card-border rounded-xl flex items-center justify-center">
-        <div className="text-center text-muted">
-          <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-          </svg>
-          <p className="text-lg">No video playing</p>
-          <p className="text-sm">Search and add a song to get started</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-2">
-      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border border-card-border">
+      <div className="w-full aspect-video bg-black rounded-xl overflow-hidden border border-card-border relative">
         <div ref={containerRef} className="w-full h-full" />
+        {!videoId && (
+          <div className="absolute inset-0 flex items-center justify-center bg-card">
+            <div className="text-center text-muted">
+              <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+              </svg>
+              <p className="text-lg">No video playing</p>
+              <p className="text-sm">Search and add a song to get started</p>
+            </div>
+          </div>
+        )}
       </div>
 
+      {videoId && (
       <div className="bg-card border border-card-border rounded-xl p-3 space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted w-10 text-right shrink-0">{formatTime(currentTime)}</span>
@@ -289,6 +287,7 @@ export default function YouTubePlayer({
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

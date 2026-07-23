@@ -7,7 +7,6 @@ import {
   logout,
   fetchPlaylists,
   fetchPlaylistVideos,
-  fetchLikedVideos,
   AuthUser,
   YouTubePlaylist,
   YouTubeVideo,
@@ -15,19 +14,17 @@ import {
 
 interface YouTubeLibraryProps {
   onAddToQueue: (video: { id: string; title: string; thumbnail: string }) => void;
-  inRoom?: boolean;
+  onPlayNow: (video: { id: string; title: string; thumbnail: string }) => void;
 }
 
-export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeLibraryProps) {
+export default function YouTubeLibrary({ onAddToQueue, onPlayNow }: YouTubeLibraryProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [playlists, setPlaylists] = useState<YouTubePlaylist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<YouTubePlaylist | null>(null);
   const [playlistVideos, setPlaylistVideos] = useState<YouTubeVideo[]>([]);
-  const [likedVideos, setLikedVideos] = useState<YouTubeVideo[]>([]);
   const [view, setView] = useState<string>("home");
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
-  const [loadingLiked, setLoadingLiked] = useState(false);
   const [loadingPlaylistDetail, setLoadingPlaylistDetail] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,16 +42,6 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
         .then((data) => setPlaylists(data.playlists || []))
         .catch((err) => setError(err.message))
         .finally(() => setLoadingPlaylists(false));
-    }
-  }, [user, view]);
-
-  useEffect(() => {
-    if (user && (view === "liked" || view === "home") && likedVideos.length === 0) {
-      setLoadingLiked(true);
-      fetchLikedVideos(50)
-        .then((data) => setLikedVideos(data.videos || []))
-        .catch((err) => setError(err.message))
-        .finally(() => setLoadingLiked(false));
     }
   }, [user, view]);
 
@@ -83,7 +70,6 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
     await logout();
     setUser(null);
     setPlaylists([]);
-    setLikedVideos([]);
     setSelectedPlaylist(null);
     setView("home");
   };
@@ -111,8 +97,8 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
         </div>
         <h3 className="text-lg font-semibold mb-2">Your Music Library</h3>
         <p className="text-sm text-muted mb-5 max-w-md mx-auto">
-          Sign in with your Google account to access your YouTube playlists and liked videos.
-          Browse, pick, and add songs to your room.
+          Sign in with your Google account to access your YouTube playlists.
+          Browse, pick, and play songs in your room.
         </p>
         <button
           onClick={redirectToGoogleLogin}
@@ -130,7 +116,7 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
     );
   }
 
-  const showBackButton = view === "playlist-detail" || view === "liked";
+  const showBackButton = view === "playlist-detail";
 
   return (
     <div className="space-y-6">
@@ -148,7 +134,7 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h2 className="text-lg font-bold">{selectedPlaylist?.title || "Liked Videos"}</h2>
+          <h2 className="text-lg font-bold">{selectedPlaylist?.title || "Playlist"}</h2>
         </div>
       )}
 
@@ -156,8 +142,8 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
         <>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold">Your Library</h2>
-              <p className="text-xs text-muted mt-0.5">{playlists.length} playlists, {likedVideos.length} liked videos</p>
+              <h2 className="text-xl font-bold">Your Playlists</h2>
+              <p className="text-xs text-muted mt-0.5">{playlists.length} playlists</p>
             </div>
             <div className="flex items-center gap-2">
               {user.picture && (
@@ -178,149 +164,40 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
             </div>
           )}
 
-          {!inRoom && (
-            <div className="bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-xs text-primary">
-                Create or join a room to start adding songs from your library
-              </p>
-            </div>
-          )}
-
-          {playlists.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-muted">Playlists</h3>
-              </div>
-              {loadingPlaylists ? (
-                <div className="flex gap-3 overflow-hidden">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-40 h-48 bg-card rounded-xl animate-pulse shrink-0" />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                  {playlists.map((pl) => (
-                    <button
-                      key={pl.id}
-                      onClick={() => handleSelectPlaylist(pl)}
-                      className="w-40 shrink-0 bg-card border border-card-border rounded-xl overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all text-left group"
-                    >
-                      <div className="w-full aspect-square bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center overflow-hidden">
-                        {pl.thumbnail ? (
-                          <img src={pl.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        ) : (
-                          <svg className="w-10 h-10 text-muted/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V4.837A2.25 2.25 0 0016.5 2.625l-1.32.377a1.803 1.803 0 01-.99-3.467L17.25.75M4.5 12h15" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <p className="text-xs font-medium truncate">{pl.title}</p>
-                        <p className="text-[10px] text-muted mt-0.5">{pl.videoCount} videos</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {likedVideos.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-muted">Liked Videos</h3>
-                <button
-                  onClick={() => setView("liked")}
-                  className="text-xs text-primary hover:text-primary-hover transition-colors"
-                >
-                  See all
-                </button>
-              </div>
-              {loadingLiked ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-20 bg-card rounded-xl animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {likedVideos.slice(0, 6).map((v) => (
-                    <div
-                      key={v.id}
-                      className="flex items-center gap-3 bg-card border border-card-border rounded-xl p-2 hover:border-primary/50 transition-all group"
-                    >
-                      <img src={v.thumbnail} alt="" className="w-14 h-10 object-cover rounded-lg shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate">{v.title}</p>
-                      </div>
-                      <button
-                        onClick={() => onAddToQueue({ id: v.id, title: v.title, thumbnail: v.thumbnail })}
-                        className="bg-primary hover:bg-primary-hover text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 text-sm font-bold shadow-lg shadow-primary/25"
-                      >
-                        +
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {playlists.length === 0 && likedVideos.length === 0 && !loadingPlaylists && !loadingLiked && (
-            <div className="text-center py-12 text-muted">
-              <p className="text-sm">No playlists or liked videos found</p>
-            </div>
-          )}
-        </>
-      )}
-
-      {view === "liked" && (
-        <>
-          {loadingLiked ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-20 bg-card rounded-xl animate-pulse" />
+          {loadingPlaylists ? (
+            <div className="flex gap-3 overflow-hidden">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="w-40 h-48 bg-card rounded-xl animate-pulse shrink-0" />
               ))}
             </div>
-          ) : likedVideos.length === 0 ? (
-            <div className="text-center py-12 text-muted">
-              <p className="text-sm">No liked videos found</p>
+          ) : playlists.length > 0 ? (
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+              {playlists.map((pl) => (
+                <button
+                  key={pl.id}
+                  onClick={() => handleSelectPlaylist(pl)}
+                  className="w-40 shrink-0 bg-card border border-card-border rounded-xl overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all text-left group"
+                >
+                  <div className="w-full aspect-square bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center overflow-hidden">
+                    {pl.thumbnail ? (
+                      <img src={pl.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <svg className="w-10 h-10 text-muted/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V4.837A2.25 2.25 0 0016.5 2.625l-1.32.377a1.803 1.803 0 01-.99-3.467L17.25.75M4.5 12h15" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="text-xs font-medium truncate">{pl.title}</p>
+                    <p className="text-[10px] text-muted mt-0.5">{pl.videoCount} videos</p>
+                  </div>
+                </button>
+              ))}
             </div>
           ) : (
-            <>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => handleAddAll(likedVideos)}
-                  className="text-xs bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-primary/25"
-                >
-                  Add all to queue
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {likedVideos.map((v) => (
-                  <div
-                    key={v.id}
-                    className="flex items-center gap-3 bg-card border border-card-border rounded-xl p-2 hover:border-primary/50 transition-all group"
-                  >
-                    <img src={v.thumbnail} alt="" className="w-14 h-10 object-cover rounded-lg shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">{v.title}</p>
-                    </div>
-                    <button
-                      onClick={() => onAddToQueue({ id: v.id, title: v.title, thumbnail: v.thumbnail })}
-                      className="bg-primary hover:bg-primary-hover text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 text-sm font-bold shadow-lg shadow-primary/25"
-                    >
-                      +
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </>
+            <div className="text-center py-12 text-muted">
+              <p className="text-sm">No playlists found</p>
+            </div>
           )}
         </>
       )}
@@ -374,8 +251,18 @@ export default function YouTubeLibrary({ onAddToQueue, inRoom = true }: YouTubeL
                     <p className="text-xs font-medium truncate">{v.title}</p>
                   </div>
                   <button
+                    onClick={() => onPlayNow({ id: v.id, title: v.title, thumbnail: v.thumbnail })}
+                    className="bg-primary hover:bg-primary-hover text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0"
+                    title="Play now"
+                  >
+                    <svg className="w-3.5 h-3.5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                  <button
                     onClick={() => onAddToQueue({ id: v.id, title: v.title, thumbnail: v.thumbnail })}
-                    className="bg-primary hover:bg-primary-hover text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 text-sm font-bold shadow-lg shadow-primary/25"
+                    className="bg-card border border-card-border hover:border-primary/50 text-foreground w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 text-sm font-bold"
+                    title="Add to queue"
                   >
                     +
                   </button>

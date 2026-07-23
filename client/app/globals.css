@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #ededed;
-  --card: #12121a;
-  --card-border: #1e1e2e;
-  --primary: #8b5cf6;
-  --primary-hover: #7c3aed;
-  --accent: #06b6d4;
-  --muted: #6b7280;
+  --background: #eef3fb;
+  --foreground: #16223d;
+  --card: #ffffff;
+  --card-border: #d7e3f5;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --accent: #0ea5e9;
+  --muted: #64748b;
   --danger: #ef4444;
-  --success: #22c55e;
+  --success: #16a34a;
 }
 
 @theme inline {
@@ -36,7 +36,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
+  scrollbar-color: #b6c8e6 transparent;
 }
 
 input, textarea {

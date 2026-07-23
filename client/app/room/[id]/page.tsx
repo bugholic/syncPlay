@@ -57,6 +57,11 @@ export default function RoomPage() {
   const navigatingAway = useRef(false);
 
   useEffect(() => {
+    if (!roomId) {
+      router.push("/");
+      return;
+    }
+
     const uname = getUsername();
     if (!uname) {
       router.push("/");
@@ -288,6 +293,21 @@ export default function RoomPage() {
     [roomId]
   );
 
+  const handlePlayNow = useCallback(
+    (video: { id: string; title: string; thumbnail: string }) => {
+      getSocket().emit("play", {
+        roomId,
+        videoId: video.id,
+        title: video.title,
+        thumbnail: video.thumbnail,
+        time: 0,
+      });
+      setCurrentVideo(video);
+      setIsPlaying(true);
+    },
+    [roomId]
+  );
+
   const handleLeave = () => {
     navigatingAway.current = true;
     router.push("/");
@@ -377,7 +397,7 @@ export default function RoomPage() {
               <SearchBar roomId={roomId} onAddToQueue={handleAddToQueue} />
             </div>
 
-            <YouTubeLibrary onAddToQueue={handleAddToQueue} />
+            <YouTubeLibrary onAddToQueue={handleAddToQueue} onPlayNow={handlePlayNow} />
 
             <div className="bg-card border border-card-border rounded-xl flex flex-col min-h-0 flex-1 overflow-hidden">
               <div className="p-3 border-b border-card-border flex items-center justify-between shrink-0">
@@ -483,7 +503,7 @@ export default function RoomPage() {
 
           {mobileTab === "library" && (
             <div className="flex-1 overflow-y-auto">
-              <YouTubeLibrary onAddToQueue={handleAddToQueue} />
+              <YouTubeLibrary onAddToQueue={handleAddToQueue} onPlayNow={handlePlayNow} />
             </div>
           )}
 
