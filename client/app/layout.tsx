@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SyncPlay - Listen Together",
   description: "Synchronized music listening with friends. Create rooms, share playlists, and vibe together.",
+  other: {
+    'google-site-verification': 'htQMri5Cba-Q6PV57kbocB9X2dsUGw1VO2V3nm8ME8g',
+  },
 };
 
 export default function RootLayout({
